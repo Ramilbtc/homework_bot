@@ -17,7 +17,6 @@ logging.basicConfig(
     level=logging.DEBUG,
     filename='main.log',
     format='%(funcName)s, %(lineno)s, %(levelname)s, %(message)s',
-    encoding='UTF-8',
     filemode='w'
 )
 
@@ -100,9 +99,7 @@ def check_response(response):
 
 
 def parse_status(homework):
-    """Извлекает из информации о конкретной домашней работе статус
-    этой работы.
-    """
+    """Извлекает из информации о конкретной домашней работе статус."""
     if 'homework_name' not in homework:
         logging.error('нет ключа homework_name')
         raise KeyError('нет ключа homework_name')
@@ -118,6 +115,7 @@ def parse_status(homework):
 
 
 def check_tokens():
+    """Проверяет переменные окружения."""
     if all([PRACTICUM_TOKEN, TELEGRAM_TOKEN, TELEGRAM_CHAT_ID]):
         return True
 

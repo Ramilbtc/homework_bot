@@ -51,26 +51,31 @@ HOMEWORK_STATUSES = {
 
 class APIUnexpectedHTTPStatus(Exception):
     """Исключение при ответе сервера отличным от 200."""
+
     pass
 
 
 class SendMessageError(Exception):
     """Исключение в отправке сообщения в ТГ."""
+
     pass
 
 
 class PageRequestError(Exception):
     """Исключение в запросе страницы."""
+    
     pass
 
 
 class HomeworkError(Exception):
     """Исключение в списке домашних работ."""
+
     pass
 
 
 class HomeworkStatusError(Exception):
     """Исключение в статусе домашних работ."""
+
     pass
 
 

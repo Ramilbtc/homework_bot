@@ -63,7 +63,7 @@ class SendMessageError(Exception):
 
 class PageRequestError(Exception):
     """Исключение в запросе страницы."""
-    
+
     pass
 
 

@@ -1,15 +1,15 @@
 from http import HTTPStatus
+from json import JSONDecodeError
 
-import requests
+from logging.handlers import RotatingFileHandler
 import os
 import time
 import logging
+import sys
 
-from logging.handlers import RotatingFileHandler
-
-from dotenv import load_dotenv
-
+import requests
 import telegram
+from dotenv import load_dotenv
 
 load_dotenv()
 
@@ -49,13 +49,39 @@ HOMEWORK_STATUSES = {
 }
 
 
+class APIUnexpectedHTTPStatus(Exception):
+    """Исключение при ответе сервера отличным от 200."""
+    pass
+
+
+class SendMessageError(Exception):
+    """Исключение в отправке сообщения в ТГ."""
+    pass
+
+
+class PageRequestError(Exception):
+    """Исключение в запросе страницы."""
+    pass
+
+
+class HomeworkError(Exception):
+    """Исключение в списке домашних работ."""
+    pass
+
+
+class HomeworkStatusError(Exception):
+    """Исключение в статусе домашних работ."""
+    pass
+
+
 def send_message(bot, message):
     """Отправляет сообщение в телеграм-чат."""
     try:
         bot.send_message(TELEGRAM_CHAT_ID, message)
         logger.info('Сообщение в отправлено {TELEGRAM_CHAT_ID}: {message}')
-    except Exception:
-        logger.critical('Ошибка. Сообщение в {TELEGRAM_CHAT_ID} не отправлено')
+    except SendMessageError:
+        logger.critical('Ошибка. Сообщение в ТГ не отправлено')
+        raise SendMessageError('Ошибка. Сообщение в ТГ не отправлено')
 
 
 def get_api_answer(current_timestamp):
@@ -67,23 +93,23 @@ def get_api_answer(current_timestamp):
                                          headers=HEADERS,
                                          params=params
                                          )
-    except Exception as error:
+    except PageRequestError as error:
         logging.error(f'Ошибка при запросе: {error}')
-        raise Exception(f'Ошибка при запросе: {error}')
+        raise PageRequestError(f'Ошибка при запросе: {error}')
     if homework_statuses.status_code != HTTPStatus.OK:
         status_code = homework_statuses.status_code
         logging.error(f'ошибка в доуступности {status_code}')
-        raise Exception(f'ошибка в доступности {status_code}')
+        raise APIUnexpectedHTTPStatus(f'ошибка в доступности {status_code}')
     try:
         return homework_statuses.json()
-    except ValueError:
+    except JSONDecodeError:
         logger.error('Ошибка парсинга')
-        raise ValueError('Ошибка парсинга')
+        raise JSONDecodeError('Ошибка парсинга')
 
 
 def check_response(response):
     """Проверяет ответ API на корректность."""
-    if type(response) is not dict:
+    if not isinstance(response, dict):
         raise TypeError('Ответ API отличен от словаря')
     try:
         list_works = response['homeworks']
@@ -92,9 +118,9 @@ def check_response(response):
         raise KeyError('Ошибка словаря по ключу homeworks')
     try:
         homework = list_works[0]
-    except IndexError:
+    except HomeworkError:
         logger.error('Список домашних работ пуст')
-        raise IndexError('Список домашних работ пуст')
+        raise HomeworkError('Список домашних работ пуст')
     return homework
 
 
@@ -109,7 +135,7 @@ def parse_status(homework):
     homework_name = homework['homework_name']
     homework_status = homework['status']
     if homework_status not in HOMEWORK_STATUSES:
-        raise Exception('неизвестный статус')
+        raise HomeworkStatusError('неизвестный статус')
     verdict = HOMEWORK_STATUSES[homework_status]
     return f'Изменился статус проверки работы "{homework_name}". {verdict}'
 
@@ -118,33 +144,37 @@ def check_tokens():
     """Проверяет переменные окружения."""
     if all([PRACTICUM_TOKEN, TELEGRAM_TOKEN, TELEGRAM_CHAT_ID]):
         return True
+    else:
+        return False
 
 
 def main():
     """Основная логика работы бота."""
     bot = telegram.Bot(token=TELEGRAM_TOKEN)
     current_timestamp = int(time.time())
-    STATUS = ''
-    ERROR_CACHE_MESSAGE = ''
+    status = ''
+    error_cache_message = ''
     if not check_tokens():
         logger.critical('Отсутствуют одна или несколько переменных окружения')
         raise Exception('Отсутствуют одна или несколько переменных окружения')
     while True:
         try:
             response = get_api_answer(current_timestamp)
-            current_timestamp = response.get('current_date')
+            current_timestamp = response.get('current_date', current_timestamp)
             message = parse_status(check_response(response))
-            if message != STATUS:
+            if message != status:
                 send_message(bot, message)
-                STATUS = message
-            time.sleep(RETRY_TIME)
+                status = message
         except Exception as error:
             logger.error(error)
-            message_t = str(error)
-            if message_t != ERROR_CACHE_MESSAGE:
-                send_message(bot, message_t)
-                ERROR_CACHE_MESSAGE = message_t
-        time.sleep(RETRY_TIME)
+            message_error = str(error)
+            if message_error != error_cache_message:
+                send_message(bot, message_error)
+                error_cache_message = message_error
+        except KeyboardInterrupt:
+            sys.exit(0)
+        finally:
+            time.sleep(RETRY_TIME)
 
 
 if __name__ == '__main__':

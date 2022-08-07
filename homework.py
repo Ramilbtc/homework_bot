@@ -1,6 +1,5 @@
 from http import HTTPStatus
 from json import JSONDecodeError
-
 from logging.handlers import RotatingFileHandler
 import os
 import time
@@ -9,7 +8,13 @@ import sys
 
 import requests
 import telegram
+from telegram.error import TelegramError
 from dotenv import load_dotenv
+
+from exceptions import (APIRequestError,
+                        APIUnexpectedHTTPStatus,
+                        HomeworkListEmptyError,
+                        HomeworkStatusError)
 
 load_dotenv()
 
@@ -49,44 +54,14 @@ HOMEWORK_STATUSES = {
 }
 
 
-class APIUnexpectedHTTPStatus(Exception):
-    """Исключение при ответе сервера отличным от 200."""
-
-    pass
-
-
-class SendMessageError(Exception):
-    """Исключение в отправке сообщения в ТГ."""
-
-    pass
-
-
-class PageRequestError(Exception):
-    """Исключение в запросе страницы."""
-
-    pass
-
-
-class HomeworkError(Exception):
-    """Исключение в списке домашних работ."""
-
-    pass
-
-
-class HomeworkStatusError(Exception):
-    """Исключение в статусе домашних работ."""
-
-    pass
-
-
 def send_message(bot, message):
     """Отправляет сообщение в телеграм-чат."""
     try:
         bot.send_message(TELEGRAM_CHAT_ID, message)
         logger.info('Сообщение в отправлено {TELEGRAM_CHAT_ID}: {message}')
-    except SendMessageError:
+    except TelegramError:
         logger.critical('Ошибка. Сообщение в ТГ не отправлено')
-        raise SendMessageError('Ошибка. Сообщение в ТГ не отправлено')
+        raise TelegramError('Ошибка. Сообщение в ТГ не отправлено')
 
 
 def get_api_answer(current_timestamp):
@@ -98,9 +73,9 @@ def get_api_answer(current_timestamp):
                                          headers=HEADERS,
                                          params=params
                                          )
-    except PageRequestError as error:
+    except APIRequestError as error:
         logging.error(f'Ошибка при запросе: {error}')
-        raise PageRequestError(f'Ошибка при запросе: {error}')
+        raise APIRequestError(f'Ошибка при запросе: {error}')
     if homework_statuses.status_code != HTTPStatus.OK:
         status_code = homework_statuses.status_code
         logging.error(f'ошибка в доуступности {status_code}')
@@ -116,16 +91,14 @@ def check_response(response):
     """Проверяет ответ API на корректность."""
     if not isinstance(response, dict):
         raise TypeError('Ответ API отличен от словаря')
-    try:
-        list_works = response['homeworks']
-    except KeyError:
+    list_works = response['homeworks']
+    if 'homeworks' not in response:
         logger.error('Ошибка словаря по ключу homeworks')
         raise KeyError('Ошибка словаря по ключу homeworks')
-    try:
-        homework = list_works[0]
-    except HomeworkError:
+    homework = list_works[0]
+    if list_works[0] == 0:
         logger.error('Список домашних работ пуст')
-        raise HomeworkError('Список домашних работ пуст')
+        raise HomeworkListEmptyError('Список домашних работ пуст')
     return homework
 
 
@@ -148,9 +121,7 @@ def parse_status(homework):
 def check_tokens():
     """Проверяет переменные окружения."""
     if all([PRACTICUM_TOKEN, TELEGRAM_TOKEN, TELEGRAM_CHAT_ID]):
-        return True
-    else:
-        return False
+        return all
 
 
 def main():

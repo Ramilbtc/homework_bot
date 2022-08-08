@@ -91,17 +91,15 @@ def check_response(response):
     """Проверяет ответ API на корректность."""
     if not isinstance(response, dict):
         raise TypeError('Ответ API отличен от словаря')
-    list_works = response['homeworks']
-    if 'homeworks' in response:
-        homework = list_works[0]
-        if list_works[0] == []:
-            logger.error('Список домашних работ пуст')
-            raise HomeworkListEmptyError('Список домашних работ пуст')
-        else:
-            return homework
-    else:
+    if 'homeworks' not in response.keys():
         logger.error('Ошибка словаря по ключу homeworks')
         raise KeyError('Ошибка словаря по ключу homeworks')
+    list_works = response['homeworks']
+    homework = list_works[0]
+    if len(list_works[0]) == 0:
+        logger.error('Список домашних работ пуст')
+        raise HomeworkListEmptyError('Список домашних работ пуст')
+    return homework
 
 
 def parse_status(homework):
@@ -122,8 +120,7 @@ def parse_status(homework):
 
 def check_tokens():
     """Проверяет переменные окружения."""
-    if all([PRACTICUM_TOKEN, TELEGRAM_TOKEN, TELEGRAM_CHAT_ID]):
-        return all([PRACTICUM_TOKEN, TELEGRAM_TOKEN, TELEGRAM_CHAT_ID])
+    return all([PRACTICUM_TOKEN, TELEGRAM_TOKEN, TELEGRAM_CHAT_ID])
 
 
 def main():

@@ -95,11 +95,12 @@ def check_response(response):
         logger.error('Ошибка словаря по ключу homeworks')
         raise KeyError('Ошибка словаря по ключу homeworks')
     list_works = response['homeworks']
-    homework = list_works[0]
-    if len(list_works[0]) == 0:
+    if list_works != []:
+        homework = list_works[0]
+        return homework
+    if len(list_works) == 0:
         logger.error('Список домашних работ пуст')
         raise HomeworkListEmptyError('Список домашних работ пуст')
-    return homework
 
 
 def parse_status(homework):

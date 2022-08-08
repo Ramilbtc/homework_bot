@@ -11,10 +11,10 @@ import telegram
 from telegram.error import TelegramError
 from dotenv import load_dotenv
 
-from exceptions import (APIRequestError,
-                        APIUnexpectedHTTPStatus,
-                        HomeworkListEmptyError,
-                        HomeworkStatusError)
+from exceptions import (
+    APIRequestError, APIUnexpectedHTTPStatus, HomeworkListEmptyError,
+    HomeworkStatusError,
+)
 
 load_dotenv()
 
@@ -92,14 +92,16 @@ def check_response(response):
     if not isinstance(response, dict):
         raise TypeError('Ответ API отличен от словаря')
     list_works = response['homeworks']
-    if 'homeworks' not in response:
+    if 'homeworks' in response:
+        homework = list_works[0]
+        if list_works[0] == []:
+            logger.error('Список домашних работ пуст')
+            raise HomeworkListEmptyError('Список домашних работ пуст')
+        else:
+            return homework
+    else:
         logger.error('Ошибка словаря по ключу homeworks')
         raise KeyError('Ошибка словаря по ключу homeworks')
-    homework = list_works[0]
-    if list_works[0] == 0:
-        logger.error('Список домашних работ пуст')
-        raise HomeworkListEmptyError('Список домашних работ пуст')
-    return homework
 
 
 def parse_status(homework):
@@ -121,7 +123,7 @@ def parse_status(homework):
 def check_tokens():
     """Проверяет переменные окружения."""
     if all([PRACTICUM_TOKEN, TELEGRAM_TOKEN, TELEGRAM_CHAT_ID]):
-        return all
+        return all([PRACTICUM_TOKEN, TELEGRAM_TOKEN, TELEGRAM_CHAT_ID])
 
 
 def main():
